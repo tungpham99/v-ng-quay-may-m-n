@@ -172,10 +172,10 @@ window.addEventListener("resize", resizeWheel);
 /* ===== DATA ===== */
 const items=[
  {text:"10K",color:"#F59E0B",weight:40},
- {text:"20K",color:"#3B82F6",weight:40},
+{text:"200K",color:"#3B82F6",weight:2},
  {text:"50K",color:"#EC4899",weight:14},
  {text:"100K",color:"#22C55E",weight:3},
- {text:"200K",color:"#F97316",weight:2},
+ {text:"20K",color:"#F97316",weight:40},
  {text:"500K",color:"#60A5FA",weight:1}
 ];
 
@@ -245,28 +245,48 @@ function pickIndex(){
 }
 
 function spin(){
-    if(spinning) return;
-    spinning=true;
+      if(spinning) return;
+    spinning = true;
     audioCtx.resume();
 
-    const idx=pickIndex();
-    const start=angle;
-    const end=6*Math.PI*2-(slice*idx+slice/2);
-    let t0=null;
+
+    angle = angle % (Math.PI * 2);
+
+    const idx = pickIndex();
+    const start = angle;
+
+    const extraRounds = 5; 
+    let end =
+        extraRounds * Math.PI * 2
+        - (slice * idx + slice / 2);
+
+    while(end <= start){
+        end += Math.PI * 2;
+    }
+
+    let t0 = null;
 
     function anim(t){
-        if(!t0) t0=t;
-        const p=Math.min((t-t0)/6000,1);
-        angle=start+(end-start)*(1-Math.pow(1-p,3));
+        if(!t0) t0 = t;
+        const p = Math.min((t - t0) / 6000, 1);
+
+        angle = start + (end - start) * (1 - Math.pow(1 - p, 3));
+
         drawWheel();
         spawnLucky();
-        if(p<1) requestAnimationFrame(anim);
-        else{
-            spinning=false;
-            result.innerText="🎉 Bạn được lì xì: "+items[idx].text;
+
+        if(p < 1){
+            requestAnimationFrame(anim);
+        } else {
+            spinning = false;
+
+            angle = end % (Math.PI * 2);
+
+            result.innerText = "🎉 Bạn được lì xì: " + items[idx].text;
             popup.classList.add("show");
         }
     }
+
     requestAnimationFrame(anim);
 }
 
