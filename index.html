@@ -6,37 +6,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-/* ===== RESET & BACKGROUND ===== */
 body{
     margin:0;
-    height:100vh;
+    min-height:100vh;
     font-family:system-ui;
     overflow:hidden;
     color:#fff;
 
-    /* Ảnh mã đáo ở trên */
     background:
-        url("https://uploads.onecompiler.io/44dcw5ur7/44dcw5w7r/madao.png") no-repeat top center / contain,
+        url("https://uploads.onecompiler.io/44dcw5ur7/44dcw5w7r/madao.png") no-repeat top center / cover,
         radial-gradient(circle at top,#1f2933,#020617);
 
     display:flex;
     justify-content:center;
-    align-items:flex-end;
 }
 
-/* khung dọc kiểu TikTok */
 .app{
     width:100%;
-    max-width:420px;
-    height:100vh;
+    max-width:520px; 
+    min-height:100vh;
     display:flex;
     flex-direction:column;
     justify-content:flex-end;
-    padding-bottom:20px;
+    padding-bottom:32px;
     box-sizing:border-box;
 }
 
-/* khu vực vòng quay */
+@media (min-width: 1024px){
+    .app{
+        max-width:680px;
+    }
+}
+
 .wheel-zone{
     display:flex;
     flex-direction:column;
@@ -44,7 +45,6 @@ body{
     gap:16px;
 }
 
-/* ===== WHEEL ===== */
 .wheel-container{
     position:relative;
     width:320px;
@@ -56,7 +56,6 @@ canvas#wheel{
     display:block;
 }
 
-/* pointer */
 .pointer{
     position:absolute;
     top:50%;
@@ -68,7 +67,6 @@ canvas#wheel{
     border-left:26px solid #fff;
 }
 
-/* ===== BUTTON ===== */
 button{
     padding:12px 36px;
     font-size:16px;
@@ -83,7 +81,6 @@ button:active{
     transform:scale(.95);
 }
 
-/* ===== EFFECT CANVAS ===== */
 canvas#fx{
     position:fixed;
     inset:0;
@@ -91,7 +88,6 @@ canvas#fx{
     z-index:1;
 }
 
-/* ===== POPUP ===== */
 .popup{
     position:fixed;
     inset:0;
@@ -141,7 +137,6 @@ canvas#fx{
 </div>
 
 <script>
-/* ===== AUDIO ===== */
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 
 function playFireSound(){
@@ -156,7 +151,6 @@ function playFireSound(){
     src.start();
 }
 
-/* ===== WHEEL ===== */
 const wheel=document.getElementById("wheel");
 const ctx=wheel.getContext("2d");
 const size=320,dpr=devicePixelRatio||1;
@@ -185,13 +179,11 @@ let spinning=false;
 function drawWheel(){
     ctx.clearRect(0,0,size,size);
 
-    /* ===== VÒNG NGOÀI MÀU VÀNG ===== */
     ctx.beginPath();
     ctx.arc(center, center, radius, 0, Math.PI * 2);
     ctx.fillStyle = "#facc15";
     ctx.fill();
 
-    /* ===== ĐÈN TRÒN ===== */
     const lightCount = 28;
     for(let i=0;i<lightCount;i++){
         const a = (Math.PI*2/lightCount)*i;
@@ -203,7 +195,6 @@ function drawWheel(){
         ctx.fill();
     }
 
-    /* ===== CÁC MIẾNG ===== */
     items.forEach((it,i)=>{
         const a = angle + i * slice;
 
@@ -214,7 +205,6 @@ function drawWheel(){
         ctx.fillStyle = it.color;
         ctx.fill();
 
-        /* chữ */
         ctx.save();
         ctx.translate(center,center);
         ctx.rotate(a + slice/2);
@@ -228,7 +218,6 @@ function drawWheel(){
         ctx.restore();
     });
 
-    /* ===== NÚT GIỮA ===== */
     ctx.beginPath();
     ctx.arc(center,center,36,0,Math.PI*2);
     ctx.fillStyle="#dc2626";
@@ -257,7 +246,6 @@ function pickIndex(){
 }
 
 
-/* ===== SPIN ===== */
 function spin(){
     if(spinning) return;
     spinning=true;
@@ -291,7 +279,6 @@ function closePopup(){
 }
 
 drawWheel();
-/* ===== FX ===== */
 const fx=document.getElementById("fx");
 const fctx=fx.getContext("2d");
 
@@ -306,7 +293,6 @@ const petals=[];
 const fireworks=[];
 const lucky=[];
 
-/* hoa rơi */
 function spawnPetal(){
     petals.push({
         x:Math.random()*fx.width,
@@ -318,7 +304,6 @@ function spawnPetal(){
     });
 }
 
-/* pháo bắn từ 2 góc */
 function launchFirework(side){
     fireworks.push({
         x:side==="L"?0:fx.width,
@@ -347,7 +332,6 @@ function explode(f){
     }
 }
 
-/* lì xì */
 function spawnLucky(){
     lucky.push({
         x:fx.width/2,
@@ -358,7 +342,6 @@ function spawnLucky(){
     });
 }
 
-/* animation */
 function animateFX(){
     fctx.clearRect(0,0,fx.width,fx.height);
 
@@ -368,7 +351,6 @@ function animateFX(){
         launchFirework("R");
     }
 
-    /* hoa */
     petals.forEach((p,i)=>{
         p.x+=p.vx;
         p.y+=p.vy;
@@ -382,7 +364,6 @@ function animateFX(){
         if(p.y>fx.height) petals.splice(i,1);
     });
 
-    /* pháo */
     fireworks.forEach((f,i)=>{
         if(!f.exploded){
             f.trail.push({x:f.x,y:f.y});
@@ -414,7 +395,6 @@ function animateFX(){
         }
     });
 
-    /* lì xì */
     lucky.forEach((l,i)=>{
         l.x+=l.vx;
         l.y+=l.vy;
@@ -431,3 +411,4 @@ animateFX();
 
 </body>
 </html>
+
