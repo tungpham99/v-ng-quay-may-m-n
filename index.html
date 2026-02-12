@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Vòng quay may mắn Tết</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+/* ===== RESET & BACKGROUND ===== */
+body{
+    margin:0;
+    height:100vh;
+    font-family:system-ui;
+    overflow:hidden;
+    color:#fff;
+
+    /* Ảnh mã đáo ở trên */
+    background:
+        url("https://uploads.onecompiler.io/44dcw5ur7/44dcw5w7r/madao.png") no-repeat top center / contain,
+        radial-gradient(circle at top,#1f2933,#020617);
+
+    display:flex;
+    justify-content:center;
+    align-items:flex-end;
+}
+
+/* khung dọc kiểu TikTok */
+.app{
+    width:100%;
+    max-width:420px;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
+    padding-bottom:20px;
+    box-sizing:border-box;
+}
+
+/* khu vực vòng quay */
+.wheel-zone{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+}
+
+/* ===== WHEEL ===== */
+.wheel-container{
+    position:relative;
+    width:320px;
+    height:320px;
+    z-index:2;
+}
+
+canvas#wheel{
+    display:block;
+}
+
+/* pointer */
+.pointer{
+    position:absolute;
+    top:50%;
+    right:-8px;
+    transform:translateY(-50%) rotate(180deg);
+    width:0;height:0;
+    border-top:14px solid transparent;
+    border-bottom:14px solid transparent;
+    border-left:26px solid #fff;
+}
+
+/* ===== BUTTON ===== */
+button{
+    padding:12px 36px;
+    font-size:16px;
+    border-radius:999px;
+    border:none;
+    cursor:pointer;
+    background:linear-gradient(135deg,#f59e0b,#ef4444);
+    color:#fff;
+    font-weight:700;
+}
+button:active{
+    transform:scale(.95);
+}
+
+/* ===== EFFECT CANVAS ===== */
+canvas#fx{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:1;
+}
+
+/* ===== POPUP ===== */
+.popup{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:9;
+    visibility:hidden;
+}
+.popup.show{
+    visibility:visible;
+}
+.popup-box{
+    background:#020617;
+    padding:28px 32px;
+    border-radius:16px;
+    text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.popup-box h2{
+    margin:0 0 20px;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="fx"></canvas>
+
+<div class="app">
+    <div class="wheel-zone">
+        <div class="wheel-container">
+            <canvas id="wheel"></canvas>
+            <div class="pointer"></div>
+        </div>
+
+        <button onclick="spin()">🧧 QUAY 🧧</button>
+    </div>
+</div>
+
+<div class="popup" id="popup">
+    <div class="popup-box">
+        <h2 id="result"></h2>
+        <button onclick="closePopup()">Đóng</button>
+    </div>
+</div>
+
+<script>
+/* ===== AUDIO ===== */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+
+function playFireSound(){
+    const buffer=audioCtx.createBuffer(1,44100,44100);
+    const data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++){
+        data[i]=(Math.random()*2-1)*Math.exp(-i/4000);
+    }
+    const src=audioCtx.createBufferSource();
+    src.buffer=buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+}
+
+/* ===== WHEEL ===== */
+const wheel=document.getElementById("wheel");
+const ctx=wheel.getContext("2d");
+const size=320,dpr=devicePixelRatio||1;
+
+wheel.width=size*dpr;
+wheel.height=size*dpr;
+wheel.style.width=size+"px";
+wheel.style.height=size+"px";
+ctx.scale(dpr,dpr);
+
+const items=[
+ {text:"10K",color:"#F59E0B",weight:50},
+ {text:"20K",color:"#EF4444",weight:45},
+ {text:"50K",color:"#EC4899",weight:5},
+ {text:"100K",color:"#22C55E",weight:0},
+ {text:"200K",color:"#06B6D4",weight:0},
+ {text:"500K",color:"#8B5CF6",weight:0}
+];
+
+const center=size/2;
+const radius=center;
+const slice=2*Math.PI/items.length;
+let angle=0;
+let spinning=false;
+
+function drawWheel(){
+    ctx.clearRect(0,0,size,size);
+
+    /* ===== VÒNG NGOÀI MÀU VÀNG ===== */
+    ctx.beginPath();
+    ctx.arc(center, center, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#facc15";
+    ctx.fill();
+
+    /* ===== ĐÈN TRÒN ===== */
+    const lightCount = 28;
+    for(let i=0;i<lightCount;i++){
+        const a = (Math.PI*2/lightCount)*i;
+        const x = center + Math.cos(a)*(radius-8);
+        const y = center + Math.sin(a)*(radius-8);
+        ctx.beginPath();
+        ctx.arc(x,y,4,0,Math.PI*2);
+        ctx.fillStyle = i%2 ? "#fff" : "#fde68a";
+        ctx.fill();
+    }
+
+    /* ===== CÁC MIẾNG ===== */
+    items.forEach((it,i)=>{
+        const a = angle + i * slice;
+
+        ctx.beginPath();
+        ctx.moveTo(center,center);
+        ctx.arc(center,center,radius-18,a,a+slice);
+        ctx.closePath();
+        ctx.fillStyle = it.color;
+        ctx.fill();
+
+        /* chữ */
+        ctx.save();
+        ctx.translate(center,center);
+        ctx.rotate(a + slice/2);
+        ctx.fillStyle="#fff";
+        ctx.font="bold 20px system-ui";
+        ctx.textAlign="right";
+        ctx.textBaseline="middle";
+        ctx.shadowColor="rgba(0,0,0,.5)";
+        ctx.shadowBlur=4;
+        ctx.fillText(it.text, radius-40, 0);
+        ctx.restore();
+    });
+
+    /* ===== NÚT GIỮA ===== */
+    ctx.beginPath();
+    ctx.arc(center,center,36,0,Math.PI*2);
+    ctx.fillStyle="#dc2626";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(center,center,30,0,Math.PI*2);
+    ctx.fillStyle="#ef4444";
+    ctx.fill();
+
+    ctx.fillStyle="#fff";
+    ctx.font="bold 14px system-ui";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText("",center,center);
+}
+
+function pickIndex(){
+    let total=items.reduce((s,i)=>s+i.weight,0);
+    let r=Math.random()*total;
+    for(let i=0;i<items.length;i++){
+        r-=items[i].weight;
+        if(r<=0) return i;
+    }
+    return 0;
+}
+
+
+/* ===== SPIN ===== */
+function spin(){
+    if(spinning) return;
+    spinning=true;
+    audioCtx.resume();
+
+    const idx=pickIndex();
+    const start=angle;
+    const end=6*Math.PI*2-(slice*idx+slice/2);
+    let t0=null;
+
+    function anim(t){
+        if(!t0) t0=t;
+        const p=Math.min((t-t0)/6000,1);
+        angle=start+(end-start)*(1-Math.pow(1-p,3));
+        drawWheel();
+        spawnLucky();
+        if(p<1){
+            requestAnimationFrame(anim);
+        }else{
+            spinning=false;
+            document.getElementById("result").innerText=
+                "🎉 Bạn được lì xì: "+items[idx].text;
+            document.getElementById("popup").classList.add("show");
+        }
+    }
+    requestAnimationFrame(anim);
+}
+
+function closePopup(){
+    document.getElementById("popup").classList.remove("show");
+}
+
+drawWheel();
+/* ===== FX ===== */
+const fx=document.getElementById("fx");
+const fctx=fx.getContext("2d");
+
+fx.width=innerWidth;
+fx.height=innerHeight;
+addEventListener("resize",()=>{
+    fx.width=innerWidth;
+    fx.height=innerHeight;
+});
+
+const petals=[];
+const fireworks=[];
+const lucky=[];
+
+/* hoa rơi */
+function spawnPetal(){
+    petals.push({
+        x:Math.random()*fx.width,
+        y:-20,
+        vx:Math.random()*1-0.5,
+        vy:Math.random()*2+2,
+        r:Math.random()*Math.PI,
+        icon:Math.random()>0.5?"🌸":"🌼"
+    });
+}
+
+/* pháo bắn từ 2 góc */
+function launchFirework(side){
+    fireworks.push({
+        x:side==="L"?0:fx.width,
+        y:fx.height,
+        vx:side==="L"?Math.random()*3+4:-(Math.random()*3+4),
+        vy:-(Math.random()*8+12),
+        trail:[],
+        exploded:false,
+        color:`hsl(${Math.random()*360},100%,60%)`
+    });
+    playFireSound();
+}
+
+function explode(f){
+    for(let i=0;i<36;i++){
+        const a=(Math.PI*2/36)*i;
+        fireworks.push({
+            x:f.x,
+            y:f.y,
+            vx:Math.cos(a)*Math.random()*4,
+            vy:Math.sin(a)*Math.random()*4,
+            life:50,
+            exploded:true,
+            color:f.color
+        });
+    }
+}
+
+/* lì xì */
+function spawnLucky(){
+    lucky.push({
+        x:fx.width/2,
+        y:fx.height-280,
+        vx:(Math.random()-0.5)*6,
+        vy:(Math.random()-1)*6,
+        life:60
+    });
+}
+
+/* animation */
+function animateFX(){
+    fctx.clearRect(0,0,fx.width,fx.height);
+
+    if(Math.random()<0.12) spawnPetal();
+    if(Math.random()<0.025){
+        launchFirework("L");
+        launchFirework("R");
+    }
+
+    /* hoa */
+    petals.forEach((p,i)=>{
+        p.x+=p.vx;
+        p.y+=p.vy;
+        p.r+=0.01;
+        fctx.save();
+        fctx.translate(p.x,p.y);
+        fctx.rotate(p.r);
+        fctx.font="22px serif";
+        fctx.fillText(p.icon,0,0);
+        fctx.restore();
+        if(p.y>fx.height) petals.splice(i,1);
+    });
+
+    /* pháo */
+    fireworks.forEach((f,i)=>{
+        if(!f.exploded){
+            f.trail.push({x:f.x,y:f.y});
+            if(f.trail.length>10) f.trail.shift();
+
+            f.x+=f.vx;
+            f.y+=f.vy;
+            f.vy+=0.2;
+
+            fctx.strokeStyle=f.color;
+            fctx.beginPath();
+            f.trail.forEach((t,j)=>{
+                j?fctx.lineTo(t.x,t.y):fctx.moveTo(t.x,t.y);
+            });
+            fctx.stroke();
+
+            if(f.vy>=0){
+                explode(f);
+                fireworks.splice(i,1);
+            }
+        }else{
+            f.x+=f.vx;
+            f.y+=f.vy;
+            f.vy+=0.05;
+            f.life--;
+            fctx.fillStyle=f.color;
+            fctx.fillRect(f.x,f.y,2,2);
+            if(f.life<=0) fireworks.splice(i,1);
+        }
+    });
+
+    /* lì xì */
+    lucky.forEach((l,i)=>{
+        l.x+=l.vx;
+        l.y+=l.vy;
+        l.life--;
+        fctx.font="24px serif";
+        fctx.fillText("🧧",l.x,l.y);
+        if(l.life<=0) lucky.splice(i,1);
+    });
+
+    requestAnimationFrame(animateFX);
+}
+animateFX();
+</script>
+
+</body>
+</html>
