@@ -137,14 +137,37 @@ canvas#fx{
 /* ===== AUDIO ===== */
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 function playFireSound(){
-    const buffer=audioCtx.createBuffer(1,44100,44100);
-    const data=buffer.getChannelData(0);
-    for(let i=0;i<data.length;i++){
-        data[i]=(Math.random()*2-1)*Math.exp(-i/4000);
+    const duration = 0.6;
+    const sampleRate = 44100;
+    const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for(let i = 0; i < data.length; i++){
+        const t = i / sampleRate;
+
+        // noise
+        let noise = Math.random() * 2 - 1;
+
+        // envelope: nổ mạnh đầu, tắt nhanh
+        let env =
+            (t < 0.02 ? t / 0.02 : 1) *   // attack 20ms
+            Math.exp(-t * 8);            // decay nhanh
+
+        data[i] = noise * env;
     }
-    const src=audioCtx.createBufferSource();
-    src.buffer=buffer;
-    src.connect(audioCtx.destination);
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioCtx.currentTime + duration
+    );
+
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
     src.start();
 }
 
@@ -172,11 +195,11 @@ window.addEventListener("resize", resizeWheel);
 /* ===== DATA ===== */
 const items=[
  {text:"10K",color:"#F59E0B",weight:40},
-{text:"200K",color:"#3B82F6",weight:2},
- {text:"50K",color:"#EC4899",weight:14},
- {text:"100K",color:"#22C55E",weight:3},
+{text:"200K",color:"#3B82F6",weight:1},
+ {text:"50K",color:"#EC4899",weight:18},
+ {text:"100K",color:"#22C55E",weight:1},
  {text:"20K",color:"#F97316",weight:40},
- {text:"500K",color:"#60A5FA",weight:1}
+ {text:"500K",color:"#60A5FA",weight:0}
 ];
 
 const slice=2*Math.PI/items.length;
@@ -232,6 +255,54 @@ function drawWheel(){
     ctx.fillStyle="#ef4444";
     ctx.fill();
 }
+function playTickSound(){
+    const duration = 0.03;
+    const sampleRate = 44100;
+    const buffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for(let i=0;i<data.length;i++){
+        // click khô, gọn
+        data[i] = (Math.random()*2-1) * Math.exp(-i/(sampleRate*0.01));
+    }
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.25;
+
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start();
+}
+function launchFirework(side){
+    fireworks.push({
+        x:side==="L"?0:fx.width,
+        y:fx.height,
+        vx:side==="L"?Math.random()*3+4:-(Math.random()*3+4),
+        vy:-(Math.random()*8+12),
+        trail:[],
+        exploded:false,
+        color:`hsl(${Math.random()*360},100%,60%)`
+    });
+}
+function explode(f){
+    const count = 48;
+    for(let i=0;i<count;i++){
+        const a = (Math.PI*2/count)*i;
+        const speed = Math.random()*3 + 3; // mạnh hơn
+        fireworks.push({
+            x:f.x,
+            y:f.y,
+            vx:Math.cos(a)*speed,
+            vy:Math.sin(a)*speed,
+            life:60,
+            exploded:true,
+            color:f.color
+        });
+    }
+}
 
 /* ===== SPIN ===== */
 function pickIndex(){
@@ -274,7 +345,7 @@ function spin(){
 
         drawWheel();
         spawnLucky();
-
+        playTickSound();
         if(p < 1){
             requestAnimationFrame(anim);
         } else {
@@ -318,9 +389,15 @@ function spawnLucky(){
 }
 
 function animateFX(){
+  
     fctx.clearRect(0,0,fx.width,fx.height);
-    if(Math.random()<0.12) spawnPetal();
+    fctx.clearRect(0,0,fx.width,fx.height);
 
+    if(Math.random()<0.12) spawnPetal();
+    if(Math.random()<0.025){
+        launchFirework("L");
+        launchFirework("R");
+    }
     petals.forEach((p,i)=>{
         p.x+=p.vx; p.y+=p.vy; p.r+=0.01;
         fctx.save();
@@ -336,6 +413,43 @@ function animateFX(){
         fctx.fillText("🧧",l.x,l.y);
         if(l.life<=0) lucky.splice(i,1);
     });
+     fireworks.forEach((f,i)=>{
+    if(!f.exploded){
+        f.trail.push({x:f.x,y:f.y});
+        if(f.trail.length>10) f.trail.shift();
+
+        f.x += f.vx;
+        f.y += f.vy;
+
+        // kiểm tra đỉnh
+        const prevVy = f.vy;
+        f.vy += 0.25;
+
+        fctx.strokeStyle = f.color;
+        fctx.beginPath();
+        f.trail.forEach((t,j)=>j?fctx.lineTo(t.x,t.y):fctx.moveTo(t.x,t.y));
+        fctx.stroke();
+
+        // 💥 nổ NGAY khi vừa chạm đỉnh
+        if(prevVy < 0 && f.vy >= 0){
+            explode(f);
+            playFireSound();   // 🔊 tiếng nổ khớp hình
+            fireworks.splice(i,1);
+        }
+    }else{
+        f.x += f.vx;
+        f.y += f.vy;
+        f.vy += 0.05;
+        f.life--;
+
+        fctx.fillStyle = f.color;
+        fctx.fillRect(f.x,f.y,2,2);
+
+        if(f.life<=0) fireworks.splice(i,1);
+    }
+});
+
+
     requestAnimationFrame(animateFX);
 }
 
